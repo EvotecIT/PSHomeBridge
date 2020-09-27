@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using System.Diagnostics;
-using System.Management.Automation;
+//using System.Diagnostics;
+//using System.Management.Automation;
 using Microsoft.Win32.SafeHandles;
 using System.IO;
 
