@@ -1,4 +1,38 @@
 function Invoke-Homebridge {
+    <#
+    .SYNOPSIS
+    Short description
+
+    .DESCRIPTION
+    Long description
+
+    .PARAMETER Arguments
+    Parameter description
+
+    .PARAMETER Get
+    Parameter description
+
+    .PARAMETER SetOn
+    Parameter description
+
+    .PARAMETER SetOff
+    Parameter description
+
+    .PARAMETER LogPath
+    Parameter description
+
+    .PARAMETER UseInvokeCommand
+    Uses Invoke-Command instead of Invoke-AsCurrentUser
+
+    .PARAMETER DefaultStatus
+    This sets behavior for when Homebridge action is not returning True/False but returns null or some other data. You can set it to True or False to make sure Homebridge provides proper information
+
+    .EXAMPLE
+    An example
+
+    .NOTES
+    General notes
+    #>
     [cmdletBinding()]
     param(
         [Array] $Arguments,
@@ -6,7 +40,8 @@ function Invoke-Homebridge {
         [scriptblock] $SetOn,
         [scriptblock] $SetOff,
         [string] $LogPath,
-        [switch] $UseInvokeCommand
+        [switch] $UseInvokeCommand,
+        [bool] $DefaultStatus = $false
     )
     $Command = $($Arguments -join ' ')
     $Action = $Arguments[0] # Get or Set
@@ -20,10 +55,21 @@ function Invoke-Homebridge {
             $Output = Invoke-Command -ScriptBlock $Get
             $Output
         } else {
-            $Output = Invoke-AsCurrentUser -ScriptBlock $Get #-DebugOutput #-NoWait
-            $Output
+            $Overwritten = $false
+            try {
+                $Output = Invoke-AsCurrentUser -ScriptBlock $Get -ErrorAction SilentlyContinue #-AsXML #-DebugOutput #-NoWait
+                if ($Output -notin @($true, $false)) {
+                    $Output = $DefaultStatus
+                    $Overwritten = $true
+                } else {
+                    $Output
+                }
+            } catch {
+                $Output = $DefaultStatus
+                $Overwritten = $true
+            }
         }
-        Write-ToLog -LogFile $LogPath -LogTime $true -Text "Invoke-Homebridge - Action: ", $Action, ", Output: ", $Output
+        Write-ToLog -LogFile $LogPath -LogTime $true -Text "Invoke-Homebridge - Action: ", $Action, ", Output: ", $Output, ", Overwritten: $Overwritten"
         Exit 0
     } elseif ($Action -eq 'Set') {
         Write-ToLog -LogFile $LogPath -LogTime $true -Text "Invoke-Homebridge - Action: ", $Action
@@ -32,7 +78,7 @@ function Invoke-Homebridge {
             if ($Options[2] -eq "'true'") {
                 if ($SetOn) {
                     try {
-                        $null = Invoke-AsCurrentUser -ScriptBlock $SetOn
+                        $null = Invoke-AsCurrentUser -ScriptBlock $SetOn -ErrorAction SilentlyContinue
                         $Output = 1
                     } catch {
                         $Output = 0
@@ -41,7 +87,7 @@ function Invoke-Homebridge {
             } else {
                 if ($SetOff) {
                     try {
-                        $null = Invoke-AsCurrentUser -ScriptBlock $SetOff
+                        $null = Invoke-AsCurrentUser -ScriptBlock $SetOff -ErrorAction SilentlyContinue
                         $Output = 1
                     } catch {
                         $Output = 0

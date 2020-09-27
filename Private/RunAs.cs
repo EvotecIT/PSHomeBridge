@@ -291,12 +291,129 @@ namespace RunAs
                         }
                     };
                 }
-            } else {
+            }
+            else
+            {
                 // when using noWait we assume output always true
                 line = "true";
             }
             bool mybool = System.Convert.ToBoolean(line);
             return mybool;
+        }
+
+
+        /// <devdoc>
+        ///   Starts a Process as the last logged-in user that is currently active.
+        ///
+        ///   <para>
+        ///     Example:
+        ///     psexec -ids powershell.exe
+        ///     Add-Type -Path .\src\ProcessExtensions.cs
+        ///     [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("C:\Windows\System32\cmd.exe", "cmd.exe /K echo running");
+        ///   </para>
+        /// </devdoc>
+        public static string StartProcessAsCurrentUserXml(string appPath, string cmdLine = null, string workDir = null, bool visible = true, bool noWait = true, bool debugOutput = true)
+        {
+            return StartProcessAsUserXml(null, appPath, cmdLine, workDir, visible, noWait, debugOutput);
+        }
+
+        /// <devdoc>
+        ///   Starts a Process as any logged-in user with an active or disconnected session.
+        ///
+        ///   <para>
+        ///     Example:
+        ///     psexec -ids powershell.exe
+        ///     Add-Type -Path .\src\ProcessExtensions.cs
+        ///     [murrayju.ProcessExtensions]::StartProcessAsUser("Mailin", "D:\RENE\XmlImport\ReneXmlImport.exe", "ReneXmlImport.exe D:\RENE\Data\Import\Adj_Selling_Price_3001.xml");
+        ///   </para>
+        /// </devdoc>
+        public static string StartProcessAsUserXml(string user, string appPath, string cmdLine = null, string workDir = null, bool visible = true, bool noWait = true, bool debugOutput = true)
+        {
+            SafeUserTokenHandle hUserToken = null;
+            var startupInfo = new NativeMethods.STARTUPINFO();
+            var processInfo = new SafeNativeMethods.PROCESS_INFORMATION();
+            //var procSH = new SafeProcessHandle();
+            //var threadSH = new SafeThreadHandle();
+
+            var environmentPtr = IntPtr.Zero;
+            int iResultOfCreateProcessAsUser;
+
+            //SafeFileHandle standardInputWritePipeHandle = null;
+            SafeFileHandle standardOutputReadPipeHandle = null;
+            SafeFileHandle standardErrorReadPipeHandle = null;
+
+            try
+            {
+                if (!GetSessionUserToken(ref hUserToken, user))
+                {
+                    throw new Exception("StartProcessAsUser: GetSessionUserToken failed.");
+                }
+                int creationFlags = NativeMethods.CREATE_UNICODE_ENVIRONMENT | (visible ? NativeMethods.CREATE_NEW_CONSOLE : NativeMethods.CREATE_NO_WINDOW);
+                startupInfo.wShowWindow = (short)(visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
+                startupInfo.lpDesktop = "winsta0\\default";
+
+                CreatePipe(out standardOutputReadPipeHandle, out startupInfo.hStdOutput, false);
+                CreatePipe(out standardErrorReadPipeHandle, out startupInfo.hStdError, false);
+                startupInfo.dwFlags = NativeMethods.STARTF_USESTDHANDLES;
+
+                if (!CreateEnvironmentBlock(out environmentPtr, hUserToken, false))
+                {
+                    throw new Exception("StartProcessAsUser: CreateEnvironmentBlock failed.");
+                }
+
+                if (String.IsNullOrEmpty(workDir)) { workDir = Environment.CurrentDirectory; }
+
+                if (!NativeMethods.CreateProcessAsUser(hUserToken,
+                    appPath, // Application Name
+                    cmdLine, // Command Line
+                    null,
+                    null,
+                    true, // Terminal Services:  You cannot inherit handles across sessions
+                    creationFlags,
+                    new HandleRef(null, environmentPtr),
+                    workDir, // Working directory
+                    startupInfo,
+                    processInfo))
+                {
+                    iResultOfCreateProcessAsUser = Marshal.GetLastWin32Error();
+                    throw new Exception("StartProcessAsUser: CreateProcessAsUser failed due to Error " + iResultOfCreateProcessAsUser.ToString() + ".\n");
+                }
+
+            }
+            finally
+            {
+                //CloseHandle(hUserToken);
+
+                if (environmentPtr != IntPtr.Zero)
+                {
+                    DestroyEnvironmentBlock(environmentPtr);
+                }
+                startupInfo.Dispose();
+
+                UnsafeNativeMethods.CloseHandle(processInfo.hThread);
+                UnsafeNativeMethods.CloseHandle(processInfo.hProcess);
+            }
+
+
+            StreamReader standardOutput = new StreamReader(new FileStream(standardOutputReadPipeHandle, FileAccess.Read, 0x1000, false), Console.OutputEncoding, true, 0x1000);
+            StreamReader standardError = new StreamReader(new FileStream(standardErrorReadPipeHandle, FileAccess.Read, 0x1000, false), Console.OutputEncoding, true, 0x1000);
+
+            string line = "";
+            if (!noWait)
+            {
+                while (!standardOutput.EndOfStream)
+                {
+                    line = standardOutput.ReadLine();
+                    if (line.Length > 0)
+                    {
+                        if (debugOutput)
+                        {
+                            Console.WriteLine("stdOutput: " + line);
+                        }
+                    };
+                }
+            }
+            return line;
         }
 
         /// <devdoc>
