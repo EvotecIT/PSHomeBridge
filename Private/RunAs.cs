@@ -291,6 +291,9 @@ namespace RunAs
                         }
                     };
                 }
+            } else {
+                // when using noWait we assume output always true
+                line = "true";
             }
             bool mybool = System.Convert.ToBoolean(line);
             return mybool;
