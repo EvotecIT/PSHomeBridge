@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Management.Automation;
 using Microsoft.Win32.SafeHandles;
 using System.IO;
 
@@ -189,9 +191,9 @@ namespace RunAs
         ///     [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("C:\Windows\System32\cmd.exe", "cmd.exe /K echo running");
         ///   </para>
         /// </devdoc>
-        public static bool StartProcessAsCurrentUser(string appPath, string cmdLine = null, string workDir = null, bool visible = true)
+        public static bool StartProcessAsCurrentUser(string appPath, string cmdLine = null, string workDir = null, bool visible = true, bool noWait = true, bool debugOutput = true)
         {
-            return StartProcessAsUser(null, appPath, cmdLine, workDir, visible);
+            return StartProcessAsUser(null, appPath, cmdLine, workDir, visible, noWait, debugOutput);
         }
 
         /// <devdoc>
@@ -204,7 +206,7 @@ namespace RunAs
         ///     [murrayju.ProcessExtensions]::StartProcessAsUser("Mailin", "D:\RENE\XmlImport\ReneXmlImport.exe", "ReneXmlImport.exe D:\RENE\Data\Import\Adj_Selling_Price_3001.xml");
         ///   </para>
         /// </devdoc>
-        public static bool StartProcessAsUser(string user, string appPath, string cmdLine = null, string workDir = null, bool visible = true)
+        public static bool StartProcessAsUser(string user, string appPath, string cmdLine = null, string workDir = null, bool visible = true, bool noWait = true, bool debugOutput = true)
         {
             SafeUserTokenHandle hUserToken = null;
             var startupInfo = new NativeMethods.STARTUPINFO();
@@ -223,9 +225,8 @@ namespace RunAs
             {
                 if (!GetSessionUserToken(ref hUserToken, user))
                 {
-                    throw new Exception("StartProcessAsCurrentUser: GetSessionUserToken failed.");
+                    throw new Exception("StartProcessAsUser: GetSessionUserToken failed.");
                 }
-
                 int creationFlags = NativeMethods.CREATE_UNICODE_ENVIRONMENT | (visible ? NativeMethods.CREATE_NEW_CONSOLE : NativeMethods.CREATE_NO_WINDOW);
                 startupInfo.wShowWindow = (short)(visible ? NativeMethods.SW_SHOW : NativeMethods.SW_HIDE);
                 startupInfo.lpDesktop = "winsta0\\default";
@@ -236,7 +237,7 @@ namespace RunAs
 
                 if (!CreateEnvironmentBlock(out environmentPtr, hUserToken, false))
                 {
-                    throw new Exception("StartProcessAsCurrentUser: CreateEnvironmentBlock failed.");
+                    throw new Exception("StartProcessAsUser: CreateEnvironmentBlock failed.");
                 }
 
                 if (String.IsNullOrEmpty(workDir)) { workDir = Environment.CurrentDirectory; }
@@ -254,7 +255,7 @@ namespace RunAs
                     processInfo))
                 {
                     iResultOfCreateProcessAsUser = Marshal.GetLastWin32Error();
-                    throw new Exception("StartProcessAsCurrentUser: CreateProcessAsUser failed due to Error " + iResultOfCreateProcessAsUser.ToString() + ".\n");
+                    throw new Exception("StartProcessAsUser: CreateProcessAsUser failed due to Error " + iResultOfCreateProcessAsUser.ToString() + ".\n");
                 }
 
             }
@@ -276,16 +277,23 @@ namespace RunAs
             StreamReader standardOutput = new StreamReader(new FileStream(standardOutputReadPipeHandle, FileAccess.Read, 0x1000, false), Console.OutputEncoding, true, 0x1000);
             StreamReader standardError = new StreamReader(new FileStream(standardErrorReadPipeHandle, FileAccess.Read, 0x1000, false), Console.OutputEncoding, true, 0x1000);
 
-            while (!standardOutput.EndOfStream)
+            string line = "";
+            if (!noWait)
             {
-                string line = standardOutput.ReadLine();
-                if (line.Length > 0)
+                while (!standardOutput.EndOfStream)
                 {
-                    Console.WriteLine("stdOutput: " + line);
-                };
+                    line = standardOutput.ReadLine();
+                    if (line.Length > 0)
+                    {
+                        if (debugOutput)
+                        {
+                            Console.WriteLine("stdOutput: " + line);
+                        }
+                    };
+                }
             }
-
-            return true;
+            bool mybool = System.Convert.ToBoolean(line);
+            return mybool;
         }
 
         /// <devdoc>
@@ -318,8 +326,7 @@ namespace RunAs
         /// <devdoc>
         ///   Implementation from: http://referencesource.microsoft.com/#System/services/monitoring/system/diagnosticts/Process.cs,9136e8bd1abc4d01
         /// </devdoc>
-        private static void CreatePipeWithSecurityAttributes(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe,
-            NativeMethods.SECURITY_ATTRIBUTES lpPipeAttributes, int nSize)
+        private static void CreatePipeWithSecurityAttributes(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, NativeMethods.SECURITY_ATTRIBUTES lpPipeAttributes, int nSize)
         {
             bool ret = NativeMethods.CreatePipe(out hReadPipe, out hWritePipe, lpPipeAttributes, nSize);
             if ((!ret || hReadPipe.IsInvalid) || hWritePipe.IsInvalid)
