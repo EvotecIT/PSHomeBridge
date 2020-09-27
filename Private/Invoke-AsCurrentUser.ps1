@@ -7,10 +7,6 @@ function Invoke-AsCurrentUser {
         [Parameter()][switch]$NoWait,
         [Parameter()][switch]$DebugOutput
     )
-    if (-not ("RunAsUser.ProcessExtensions" -as [type])) {
-        $SourceRunAsUser = Get-Content -Path $PSScriptRoot\RunAsUser.cs -Raw
-        Add-Type -TypeDefinition $SourceRunAsUser -Language CSharp
-    }
     if (-not ("RunAs.ProcessExtensions" -as [type])) {
         $SourceRunAs = Get-Content -Path $PSScriptRoot\RunAs.cs -Raw
         Add-Type -TypeDefinition $SourceRunAs -Language CSharp
