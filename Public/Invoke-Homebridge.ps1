@@ -5,7 +5,8 @@ function Invoke-Homebridge {
         [scriptblock] $Get,
         [scriptblock] $SetOn,
         [scriptblock] $SetOff,
-        [string] $LogPath
+        [string] $LogPath,
+        [switch] $UseInvokeCommand
     )
     $Command = $($Arguments -join ' ')
     $Action = $Arguments[0] # Get or Set
@@ -15,8 +16,13 @@ function Invoke-Homebridge {
     Write-ToLog -LogFile $LogPath -LogTime $true -Text "Invoke-Homebridge - Executing: ", $Command
     if ($Action -eq 'Get') {
         Write-ToLog -LogFile $LogPath -LogTime $true -Text "Invoke-Homebridge - Action: ", $Action
-        $Output = Invoke-AsCurrentUser -ScriptBlock $Get #-DebugOutput #-NoWait
-        $Output
+        if ($UseInvokeCommand) {
+            $Output = Invoke-Command -ScriptBlock $Get
+            $Output
+        } else {
+            $Output = Invoke-AsCurrentUser -ScriptBlock $Get #-DebugOutput #-NoWait
+            $Output
+        }
         Write-ToLog -LogFile $LogPath -LogTime $true -Text "Invoke-Homebridge - Action: ", $Action, ", Output: ", $Output
         Exit 0
     } elseif ($Action -eq 'Set') {
