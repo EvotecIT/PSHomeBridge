@@ -41,7 +41,8 @@ function Invoke-Homebridge {
         [scriptblock] $SetOff,
         [string] $LogPath,
         [switch] $UseInvokeCommand,
-        [bool] $DefaultStatus = $false
+        [bool] $DefaultStatus = $false,
+        [switch] $DebugOutput
     )
     $Command = $($Arguments -join ' ')
     $Action = $Arguments[0] # Get or Set
@@ -57,7 +58,7 @@ function Invoke-Homebridge {
         } else {
             $Overwritten = $false
             try {
-                $Output = Invoke-AsCurrentUser -ScriptBlock $Get -ErrorAction SilentlyContinue #-AsXML #-DebugOutput #-NoWait
+                $Output = Invoke-AsCurrentUser -ScriptBlock $Get -ErrorAction SilentlyContinue -DebugOutput:$DebugOutput.IsPresent #-AsXML #-DebugOutput #-NoWait
                 if ($Output -notin @($true, $false)) {
                     $Output = $DefaultStatus
                     $Overwritten = $true

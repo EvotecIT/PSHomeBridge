@@ -40,7 +40,7 @@ function Invoke-AsCurrentUser {
         [switch] $AsXML
     )
     if (-not ("RunAs.ProcessExtensions" -as [type])) {
-        $SourceRunAs = Get-Content -Path "$PSScriptRoot\..\Resources\RunAs" -Raw
+        $SourceRunAs = Get-Content -Path "$PSScriptRoot\..\Resources\RunAs.cs" -Raw
         Add-Type -TypeDefinition $SourceRunAs -Language CSharp
     }
     $encodedcommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($ScriptBlock))
